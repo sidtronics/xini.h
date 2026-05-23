@@ -73,7 +73,7 @@ void xini_dump_config(FILE *f, xini_config *cfg);
 
 // generate dynamic section handlers
 #define XINI_DYNAMIC_SECTION(sname)                                            \
-  bool xini_entry_handler_##sname(xini_context *ctx);
+  bool xini_##sname##_entry_handler(xini_context *ctx);
 #define XINI_STATIC_SECTION(sname, entries)
 XINI_SECTIONS
 #undef XINI_DYNAMIC_SECTION
@@ -178,7 +178,7 @@ static inline bool _parse_entry(xini_section section, xini_context *ctx,
 
 #define XINI_DYNAMIC_SECTION(sname)                                            \
   case F_##sname:                                                              \
-    if (!xini_entry_handler_##sname(ctx)) {                                    \
+    if (!xini_##sname##_entry_handler(ctx)) {                                  \
       return 0;                                                                \
     }                                                                          \
     break;
