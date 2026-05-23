@@ -57,15 +57,15 @@ typedef struct _xini_config {
 #undef XINI_ENTRY
 } xini_config;
 
-typedef struct _xini_pair {
+typedef struct _xini_entry {
   const char *key;
   const char *value;
-} xini_pair;
+} xini_entry;
 
 typedef struct _xini_context {
   const char *filename;
   void *userdata;
-  xini_pair pair;
+  xini_entry entry;
 } xini_context;
 
 bool xini_parse_config(xini_context *ctx, xini_config *cfg);
@@ -168,12 +168,12 @@ static inline bool _parse_entry(xini_section section, xini_context *ctx,
 
 #define XINI_ENUM(name, values) xini_enum_##name : _xini_parse_enum_##name,
 #define XINI_ENTRY(sname, name, type)                                          \
-  else if (strcmp(ctx->pair.key, #name) == 0) {                                \
+  else if (strcmp(ctx->entry.key, #name) == 0) {                               \
     if (!(_Generic((cfg->sname.name),                                          \
               XINI_ENUMS XINI_STR: _xini_parse_str,                            \
               XINI_INT: _xini_parse_int,                                       \
               XINI_DBL: _xini_parse_dbl))(&cfg->sname.name,                    \
-                                          ctx->pair.value)) {                  \
+                                          ctx->entry.value)) {                 \
       /* conversion error */                                                   \
       return 0;                                                                \
     }                                                                          \
@@ -225,7 +225,7 @@ typedef enum _xini_parse_status {
   XINI_PARSED_ERROR,
 } xini_parse_status;
 
-static inline xini_parse_status _parse_next(FILE *file, xini_pair *pair,
+static inline xini_parse_status _parse_next(FILE *file, xini_entry *pair,
                                             char *line) {
 
   while (fgets(line, XINI_LINE_BUFFER_SIZE, file)) {
@@ -309,10 +309,10 @@ bool xini_parse_config(xini_context *ctx, xini_config *cfg) {
   xini_parse_status status;
   char line[XINI_LINE_BUFFER_SIZE];
   xini_section section = XINI_SECTION_NONE;
-  while ((status = _parse_next(file, &ctx->pair, line)) != XINI_PARSED_EOF) {
+  while ((status = _parse_next(file, &ctx->entry, line)) != XINI_PARSED_EOF) {
 
     if (status == XINI_PARSED_SECTION) {
-      section = _parse_section(ctx->pair.key);
+      section = _parse_section(ctx->entry.key);
       continue;
     }
 
