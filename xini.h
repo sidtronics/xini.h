@@ -83,7 +83,10 @@ XINI_SECTIONS
 
 static inline bool _xini_parse_str(XINI_STR *dest, const char *src) {
   *dest = strdup(src);
-  return true;
+  if (!*dest)
+    return false;
+  else
+    return true;
 }
 
 static inline bool _xini_parse_int(XINI_INT *dest, const char *src) {
