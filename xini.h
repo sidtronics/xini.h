@@ -45,7 +45,7 @@ typedef const char *xini_str;
 typedef double xini_dbl;
 
 typedef struct _xini_config {
-#define XINI_ENTRY(sname, name, type) type name;
+#define XINI_ENTRY(sname, type, name) type name;
 #define XINI_DYNAMIC_SECTION(sname)
 #define XINI_STATIC_SECTION(sname, entries)                                    \
   struct {                                                                     \
@@ -178,7 +178,7 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
     break;
 
 #define XINI_ENUM(name, values) xini_enum_##name : xini__parse_enum_##name,
-#define XINI_ENTRY(sname, name, type)                                          \
+#define XINI_ENTRY(sname, type, name)                                          \
   else if (strcmp(ctx->entry.key, #name) == 0) {                               \
     if (!(_Generic((cfg->sname.name),                                          \
               XINI_ENUMS xini_str: xini__parse_str,                            \
@@ -383,7 +383,7 @@ XINI_ENUMS
 
 void xini_print_config(FILE *file, const xini_config *cfg) {
 #define XINI_ENUM(name, values) xini_enum_##name : xini__print_enum_##name,
-#define XINI_ENTRY(sname, name, type)                                          \
+#define XINI_ENTRY(sname, type, name)                                          \
   (_Generic((cfg->sname.name),                                                 \
        XINI_ENUMS xini_str: xini__print_str,                                   \
        xini_int: xini__print_int,                                              \
