@@ -76,7 +76,7 @@ static inline xini_context xini_context_init(const char *filename,
 }
 
 bool xini_parse_config(xini_context *ctx, xini_config *cfg);
-void xini_dump_config(FILE *f, xini_config *cfg);
+void xini_print_config(FILE *f, const xini_config *cfg);
 
 // generate dynamic section handlers
 #define XINI_DYNAMIC_SECTION(sname)                                            \
@@ -233,6 +233,7 @@ typedef enum _xini_parse_status {
 } xini_parse_status;
 
 static inline xini_parse_status xini__parse_next(FILE *file, xini_entry *pair,
+                                                 char *line) {
 
   while (fgets(line, XINI_LINE_BUFFER_SIZE, file)) {
 
@@ -375,6 +376,7 @@ XINI_ENUMS
 #undef XINI_ENUM
 #undef XINI_ENUM_VAL
 
+void xini_print_config(FILE *file, const xini_config *cfg) {
 #define XINI_ENUM(name, values) xini_enum_##name : xini__print_enum_##name,
 #define XINI_ENTRY(sname, name, type)                                          \
   (_Generic((cfg->sname.name),                                                 \
