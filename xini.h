@@ -81,7 +81,7 @@ XINI_SECTIONS
 
 #ifdef XINI_IMPLEMENTATION
 
-static inline bool _xini_parse_str(XINI_STR *dest, const char *src) {
+static inline bool xini__parse_str(XINI_STR *dest, const char *src) {
   *dest = strdup(src);
   if (!*dest)
     return false;
@@ -89,7 +89,7 @@ static inline bool _xini_parse_str(XINI_STR *dest, const char *src) {
     return true;
 }
 
-static inline bool _xini_parse_int(XINI_INT *dest, const char *src) {
+static inline bool xini__parse_int(XINI_INT *dest, const char *src) {
   char *endptr = NULL;
   long val;
 
@@ -106,7 +106,7 @@ static inline bool _xini_parse_int(XINI_INT *dest, const char *src) {
   return true;
 }
 
-static inline bool _xini_parse_dbl(XINI_DBL *dest, const char *src) {
+static inline bool xini__parse_dbl(XINI_DBL *dest, const char *src) {
 
   char *endptr = NULL;
   double val;
@@ -128,7 +128,7 @@ static inline bool _xini_parse_dbl(XINI_DBL *dest, const char *src) {
   }
 
 #define XINI_ENUM(name, values)                                                \
-  static inline bool _xini_parse_enum_##name(xini_enum_##name *dest,           \
+  static inline bool xini__parse_enum_##name(xini_enum_##name *dest,           \
                                              const char *src) {                \
     if (0) {                                                                   \
     }                                                                          \
@@ -153,8 +153,8 @@ typedef enum _xini_section {
 #undef XINI_STATIC_SECTION
 } xini_section;
 
-static inline bool _parse_entry(xini_section section, xini_context *ctx,
-                                xini_config *cfg) {
+static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
+                                     xini_config *cfg) {
 
   switch (section) {
 
@@ -166,13 +166,13 @@ static inline bool _parse_entry(xini_section section, xini_context *ctx,
     /* handle unknown section */
     break;
 
-#define XINI_ENUM(name, values) xini_enum_##name : _xini_parse_enum_##name,
+#define XINI_ENUM(name, values) xini_enum_##name : xini__parse_enum_##name,
 #define XINI_ENTRY(sname, name, type)                                          \
   else if (strcmp(ctx->entry.key, #name) == 0) {                               \
     if (!(_Generic((cfg->sname.name),                                          \
-              XINI_ENUMS XINI_STR: _xini_parse_str,                            \
-              XINI_INT: _xini_parse_int,                                       \
-              XINI_DBL: _xini_parse_dbl))(&cfg->sname.name,                    \
+              XINI_ENUMS XINI_STR: xini__parse_str,                            \
+              XINI_INT: xini__parse_int,                                       \
+              XINI_DBL: xini__parse_dbl))(&cfg->sname.name,                    \
                                           ctx->entry.value)) {                 \
       /* conversion error */                                                   \
       return 0;                                                                \
@@ -204,7 +204,7 @@ static inline bool _parse_entry(xini_section section, xini_context *ctx,
   return 1;
 }
 
-static char *_trim(char *s) {
+static char *xini__trim(char *s) {
 
   while (isspace(*s))
     s++;
@@ -225,12 +225,11 @@ typedef enum _xini_parse_status {
   XINI_PARSED_ERROR,
 } xini_parse_status;
 
-static inline xini_parse_status _parse_next(FILE *file, xini_entry *pair,
-                                            char *line) {
+static inline xini_parse_status xini__parse_next(FILE *file, xini_entry *pair,
 
   while (fgets(line, XINI_LINE_BUFFER_SIZE, file)) {
 
-    char *start = _trim(line);
+    char *start = xini__trim(line);
     if (*start == '\0' || *start == '#')
       continue;
 
@@ -254,13 +253,13 @@ static inline xini_parse_status _parse_next(FILE *file, xini_entry *pair,
     }
 
     *eq = 0;
-    char *key = _trim(start);
+    char *key = xini__trim(start);
     if (!*key) {
       /* error */
       return XINI_PARSED_ERROR;
     }
 
-    char *value = _trim(eq + 1);
+    char *value = xini__trim(eq + 1);
     if (!*value) {
       /* error */
       return XINI_PARSED_ERROR;
@@ -284,7 +283,7 @@ static inline xini_parse_status _parse_next(FILE *file, xini_entry *pair,
   return XINI_PARSED_EOF;
 }
 
-static inline xini_section _parse_section(const char *section) {
+static inline xini_section xini__parse_section(const char *section) {
   if (0) {
   }
 #define XINI_DYNAMIC_SECTION(sname)                                            \
@@ -309,10 +308,10 @@ bool xini_parse_config(xini_context *ctx, xini_config *cfg) {
   xini_parse_status status;
   char line[XINI_LINE_BUFFER_SIZE];
   xini_section section = XINI_SECTION_NONE;
-  while ((status = _parse_next(file, &ctx->entry, line)) != XINI_PARSED_EOF) {
+  while ((status = xini__parse_next(file, &ctx->entry, line)) !=
 
     if (status == XINI_PARSED_SECTION) {
-      section = _parse_section(ctx->entry.key);
+      section = xini__parse_section(ctx->entry.key);
       continue;
     }
 
@@ -321,7 +320,7 @@ bool xini_parse_config(xini_context *ctx, xini_config *cfg) {
       goto bail;
     }
 
-    if (!_parse_entry(section, ctx, cfg)) {
+    if (!xini__parse_entry(section, ctx, cfg)) {
       /* error */
       goto bail;
     }
@@ -339,21 +338,17 @@ bail:
   return ret;
 }
 
-static inline void _xini_print(FILE *f, const char *fmt, ...) {
-  va_list ap;
+static inline void xini__print_int(FILE *file, const char *key,
   va_start(ap, fmt);
   vfprintf(f, fmt, ap);
   va_end(ap);
 }
 
-static inline void _xini_print_int(FILE *f, const char *key, XINI_INT value) {
+static inline void xini__print_dbl(FILE *file, const char *key,
   _xini_print(f, "%s = %d\n", key, value);
 }
 
-static inline void _xini_print_dbl(FILE *f, const char *key, XINI_DBL value) {
-  _xini_print(f, "%s = %.2f\n", key, value);
-}
-
+static inline void xini__print_str(FILE *file, const char *key,
 static inline void _xini_print_str(FILE *f, const char *key, XINI_STR value) {
   _xini_print(f, "%s = \"%s\"\n", key, value);
 }
@@ -361,7 +356,7 @@ static inline void _xini_print_str(FILE *f, const char *key, XINI_STR value) {
 // generate enum printers
 #define XINI_ENUM_VAL(id, str) str,
 #define XINI_ENUM(name, values)                                                \
-  static inline void _xini_print_enum_##name(FILE *f, const char *key,         \
+  static inline void xini__print_enum_##name(FILE *file, const char *key,      \
                                              xini_enum_##name value) {         \
                                                                                \
     const char *enum_to_str[] = {values};                                      \
@@ -373,13 +368,12 @@ XINI_ENUMS
 #undef XINI_ENUM
 #undef XINI_ENUM_VAL
 
-void xini_dump_config(FILE *f, xini_config *cfg) {
-#define XINI_ENUM(name, values) xini_enum_##name : _xini_print_enum_##name,
+#define XINI_ENUM(name, values) xini_enum_##name : xini__print_enum_##name,
 #define XINI_ENTRY(sname, name, type)                                          \
   (_Generic((cfg->sname.name),                                                 \
-       XINI_ENUMS XINI_STR: _xini_print_str,                                   \
-       XINI_INT: _xini_print_int,                                              \
-       XINI_DBL: _xini_print_dbl))(f, #name, cfg->sname.name);
+       XINI_ENUMS XINI_STR: xini__print_str,                                   \
+       XINI_INT: xini__print_int,                                              \
+       XINI_DBL: xini__print_dbl))(file, #name, cfg->sname.name);
 
 #define XINI_DYNAMIC_SECTION(sname)
 #define XINI_STATIC_SECTION(sname, entries)                                    \
