@@ -33,7 +33,7 @@
 #endif
 
 // generate enums
-#define XINI_ENUM_VAL(id, str) id,
+#define XINI_ENUM_VAL(id, string) id,
 #define XINI_ENUM(name, values)                                                \
   typedef enum _xini_enum_##name{values} xini_enum_##name;
 XINI_ENUMS
@@ -45,7 +45,7 @@ typedef const char *XINI_STR;
 typedef double XINI_DBL;
 
 typedef struct _xini_config {
-#define XINI_ENTRY(s, name, type) type name;
+#define XINI_ENTRY(sname, name, type) type name;
 #define XINI_DYNAMIC_SECTION(sname)
 #define XINI_STATIC_SECTION(sname, entries)                                    \
   struct {                                                                     \
@@ -122,8 +122,8 @@ static inline bool _xini_parse_dbl(XINI_DBL *dest, const char *src) {
 }
 
 // generate enum parsers
-#define XINI_ENUM_VAL(id, str)                                                 \
-  else if (strcmp(src, str) == 0) {                                            \
+#define XINI_ENUM_VAL(id, string)                                              \
+  else if (strcmp(src, string) == 0) {                                         \
     *dest = id;                                                                \
   }
 
