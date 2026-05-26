@@ -151,10 +151,10 @@ XINI_ENUMS
 #undef XINI_ENUM_VAL
 
 typedef enum {
-  XINI_SECTION_NONE,
-  XINI_SECTION_UNKNOWN,
-#define XINI_DYNAMIC_SECTION(sname) F_##sname,
-#define XINI_STATIC_SECTION(sname, entries) F_##sname,
+  XINI__SECTION_NONE,
+  XINI__SECTION_UNKNOWN,
+#define XINI_DYNAMIC_SECTION(sname) XINI__SECTION_##sname,
+#define XINI_STATIC_SECTION(sname, entries) XINI__SECTION_##sname,
   XINI_SECTIONS
 #undef XINI_DYNAMIC_SECTION
 #undef XINI_STATIC_SECTION
@@ -165,11 +165,11 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
 
   switch (section) {
 
-  case XINI_SECTION_NONE:
+  case XINI__SECTION_NONE:
     /* handle entries without any section */
     break;
 
-  case XINI_SECTION_UNKNOWN:
+  case XINI__SECTION_UNKNOWN:
     /* handle unknown section */
     break;
 
@@ -187,14 +187,14 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
   }
 
 #define XINI_DYNAMIC_SECTION(sname)                                            \
-  case F_##sname:                                                              \
+  case XINI__SECTION_##sname:                                                  \
     if (!xini_##sname##_entry_handler(ctx)) {                                  \
       return 0;                                                                \
     }                                                                          \
     break;
 
 #define XINI_STATIC_SECTION(sname, entries)                                    \
-  case F_##sname:                                                              \
+  case XINI__SECTION_##sname:                                                  \
     if (0) {                                                                   \
     }                                                                          \
     entries(sname) else { /* error */ }                                        \
@@ -226,10 +226,10 @@ static char *xini__trim(char *s) {
 }
 
 typedef enum {
-  XINI_PARSED_ENTRY,
-  XINI_PARSED_SECTION,
-  XINI_PARSED_EOF,
-  XINI_PARSED_ERROR,
+  XINI__PARSED_ENTRY,
+  XINI__PARSED_SECTION,
+  XINI__PARSED_EOF,
+  XINI__PARSED_ERROR,
 } xini_parse_status;
 
 static inline xini_parse_status xini__parse_next(FILE *file, xini_entry *pair,
@@ -244,33 +244,33 @@ static inline xini_parse_status xini__parse_next(FILE *file, xini_entry *pair,
     if (*start == '[') {
       char *end = strchr(start + 1, ']');
       if (!end) {
-        return XINI_PARSED_ERROR;
+        return XINI__PARSED_ERROR;
         /* error */
       }
 
       *end = '\0';
 
       pair->key = start + 1;
-      return XINI_PARSED_SECTION;
+      return XINI__PARSED_SECTION;
     }
 
     char *eq = strchr(start, '=');
     if (!eq) {
       /* error */
-      return XINI_PARSED_ERROR;
+      return XINI__PARSED_ERROR;
     }
 
     *eq = 0;
     char *key = xini__trim(start);
     if (!*key) {
       /* error */
-      return XINI_PARSED_ERROR;
+      return XINI__PARSED_ERROR;
     }
 
     char *value = xini__trim(eq + 1);
     if (!*value) {
       /* error */
-      return XINI_PARSED_ERROR;
+      return XINI__PARSED_ERROR;
     }
 
     if (*value == '"') {
@@ -278,30 +278,30 @@ static inline xini_parse_status xini__parse_next(FILE *file, xini_entry *pair,
       char *end = strchr(value, '"');
       if (!end) {
         /* error */
-        return XINI_PARSED_ERROR;
+        return XINI__PARSED_ERROR;
       }
       *end = 0;
     }
 
     pair->key = key;
     pair->value = value;
-    return XINI_PARSED_ENTRY;
+    return XINI__PARSED_ENTRY;
   }
 
-  return XINI_PARSED_EOF;
+  return XINI__PARSED_EOF;
 }
 
 static inline xini_section xini__parse_section(const char *section) {
   if (0) {
   }
 #define XINI_DYNAMIC_SECTION(sname)                                            \
-  else if (strcmp(section, #sname) == 0) return F_##sname;
+  else if (strcmp(section, #sname) == 0) return XINI__SECTION_##sname;
 #define XINI_STATIC_SECTION(sname, entries)                                    \
-  else if (strcmp(section, #sname) == 0) return F_##sname;
+  else if (strcmp(section, #sname) == 0) return XINI__SECTION_##sname;
   XINI_SECTIONS
 #undef XINI_DYNAMIC_SECTION
 #undef XINI_STATIC_SECTION
-  else return XINI_SECTION_UNKNOWN;
+  else return XINI__SECTION_UNKNOWN;
 }
 
 bool xini_parse_config(xini_context *ctx, xini_config *cfg) {
@@ -315,15 +315,16 @@ bool xini_parse_config(xini_context *ctx, xini_config *cfg) {
   bool ret = 0;
   xini_parse_status status;
   char line[XINI_LINE_BUFFER_SIZE];
-  xini_section section = XINI_SECTION_NONE;
+  xini_section section = XINI__SECTION_NONE;
   while ((status = xini__parse_next(file, &ctx->entry, line)) !=
+         XINI__PARSED_EOF) {
 
-    if (status == XINI_PARSED_SECTION) {
+    if (status == XINI__PARSED_SECTION) {
       section = xini__parse_section(ctx->entry.key);
       continue;
     }
 
-    if (status == XINI_PARSED_ERROR) {
+    if (status == XINI__PARSED_ERROR) {
       /* error */
       goto bail;
     }
@@ -334,7 +335,7 @@ bool xini_parse_config(xini_context *ctx, xini_config *cfg) {
     }
   }
 
-  if (section == XINI_SECTION_NONE) {
+  if (section == XINI__SECTION_NONE) {
     /* error */
     goto bail;
   }
