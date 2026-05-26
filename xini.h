@@ -150,7 +150,7 @@ XINI_ENUMS
 #undef XINI_ENUM
 #undef XINI_ENUM_VAL
 
-typedef enum _xini_section {
+typedef enum {
   XINI_SECTION_NONE,
   XINI_SECTION_UNKNOWN,
 #define XINI_DYNAMIC_SECTION(sname) F_##sname,
@@ -225,7 +225,7 @@ static char *xini__trim(char *s) {
   return s;
 }
 
-typedef enum _xini_parse_status {
+typedef enum {
   XINI_PARSED_ENTRY,
   XINI_PARSED_SECTION,
   XINI_PARSED_EOF,
