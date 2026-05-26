@@ -86,6 +86,10 @@ XINI_SECTIONS
 #undef XINI_DYNAMIC_SECTION
 #undef XINI_STATIC_SECTION
 
+#endif // !XINI_H_
+
+////////////////////////////////////////////////////////////////////////////////
+
 #ifdef XINI_IMPLEMENTATION
 
 static inline bool xini__parse_str(XINI_STR *dest, const char *src) {
@@ -399,4 +403,3 @@ void xini_print_config(FILE *file, const xini_config *cfg) {
 }
 
 #endif // XINI_IMPLEMENTATION
-#endif // !XINI_H_
