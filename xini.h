@@ -347,18 +347,18 @@ bail:
 }
 
 static inline void xini__print_int(FILE *file, const char *key,
-  va_start(ap, fmt);
-  vfprintf(f, fmt, ap);
-  va_end(ap);
+                                   XINI_INT value) {
+  fprintf(file, "%s = %d\n", key, value);
 }
 
 static inline void xini__print_dbl(FILE *file, const char *key,
-  _xini_print(f, "%s = %d\n", key, value);
+                                   XINI_DBL value) {
+  fprintf(file, "%s = %.2f\n", key, value);
 }
 
 static inline void xini__print_str(FILE *file, const char *key,
-static inline void _xini_print_str(FILE *f, const char *key, XINI_STR value) {
-  _xini_print(f, "%s = \"%s\"\n", key, value);
+                                   XINI_STR value) {
+  fprintf(file, "%s = \"%s\"\n", key, value);
 }
 
 // generate enum printers
@@ -368,7 +368,7 @@ static inline void _xini_print_str(FILE *f, const char *key, XINI_STR value) {
                                              xini_enum_##name value) {         \
                                                                                \
     const char *enum_to_str[] = {values};                                      \
-    _xini_print(f, "%s = \"%s\"\n", key, enum_to_str[value]);                  \
+    fprintf(file, "%s = \"%s\"\n", key, enum_to_str[value]);                   \
   }
 
 XINI_ENUMS
@@ -386,8 +386,8 @@ void xini_print_config(FILE *file, const xini_config *cfg) {
 
 #define XINI_DYNAMIC_SECTION(sname)
 #define XINI_STATIC_SECTION(sname, entries)                                    \
-  _xini_print(f, "[%s]\n", #sname);                                            \
-  entries(sname) _xini_print(f, "\n");
+  fprintf(file, "[%s]\n", #sname);                                             \
+  entries(sname) fprintf(file, "\n");
 
   XINI_SECTIONS
 
