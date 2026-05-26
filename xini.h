@@ -68,6 +68,13 @@ typedef struct _xini_context {
   xini_entry entry;
 } xini_context;
 
+static inline xini_context xini_context_init(const char *filename,
+                                             void *userdata) {
+  return (xini_context){.filename = filename,
+                        .userdata = userdata,
+                        .entry = {.key = NULL, .value = NULL}};
+}
+
 bool xini_parse_config(xini_context *ctx, xini_config *cfg);
 void xini_dump_config(FILE *f, xini_config *cfg);
 
