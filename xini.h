@@ -6,12 +6,18 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "xini_defs.h"
 #define XINI_IMPLEMENTATION
+
+// options
+#ifndef XINI_SECTION_MASK_TYPE
+#define XINI_SECTION_MASK_TYPE uint32_t
+#endif
 
 #ifndef XINI_LINE_BUFFER_SIZE
 #define XINI_LINE_BUFFER_SIZE 256
@@ -44,11 +50,36 @@ typedef int xini_int;
 typedef const char *xini_str;
 typedef double xini_dbl;
 
+#define XINI_ENTRY(sname, type, name, default_value)                           \
+  xini__entry_id_##sname##_##name,
+#define XINI_DYNAMIC_SECTION(sname)
+#define XINI_STATIC_SECTION(sname, entries)                                    \
+  typedef enum {                                                               \
+    entries(sname) xini__##sname##_entry_count                                 \
+  } xini_##sname##_entry_id;                                                   \
+  _Static_assert(                                                              \
+      sizeof(XINI_SECTION_MASK_TYPE) * CHAR_BIT >=                             \
+          xini__##sname##_entry_count,                                         \
+      "[xini.h]: ERROR: XINI_SECTION_MASK_TYPE cannot accommodate current "    \
+      "number of "                                                             \
+      "entries in " #sname "section. Please change XINI_SECTION_MASK_TYPE to " \
+      "a type with larger size.");
+XINI_SECTIONS
+#undef XINI_DYNAMIC_SECTION
+#undef XINI_STATIC_SECTION
+#undef XINI_ENTRY
+
+#define XINI__GET_ENTRY_FLAG(sname, name)                                      \
+  (1 << (xini__entry_id_##sname##_##name))
+
+#define XINI__GET_SECTION_MASK(cfg, sname) (cfg->sname.xini__entry_mask)
+
 typedef struct _xini_config {
-#define XINI_ENTRY(sname, type, name) type name;
+#define XINI_ENTRY(sname, type, name, default_value) type name;
 #define XINI_DYNAMIC_SECTION(sname)
 #define XINI_STATIC_SECTION(sname, entries)                                    \
   struct {                                                                     \
+    XINI_SECTION_MASK_TYPE xini__entry_mask;                                   \
     entries(sname)                                                             \
   } sname;
   XINI_SECTIONS
@@ -78,6 +109,13 @@ static inline xini_context xini_context_init(const char *filename,
 bool xini_parse_config(xini_context *ctx, xini_config *cfg);
 void xini_print_config(FILE *f, const xini_config *cfg);
 
+#define xini_is_section_parsed(cfg, section)                                   \
+  (XINI__GET_SECTION_MASK((cfg), section) != 0)
+
+#define xini_is_entry_parsed(cfg, section, entry)                              \
+  (XINI__GET_SECTION_MASK((cfg), section) &                                    \
+   XINI__GET_ENTRY_FLAG(section, entry))
+
 // generate dynamic section handlers
 #define XINI_DYNAMIC_SECTION(sname)                                            \
   bool xini_##sname##_entry_handler(xini_context *ctx);
@@ -91,6 +129,55 @@ XINI_SECTIONS
 ////////////////////////////////////////////////////////////////////////////////
 
 #ifdef XINI_IMPLEMENTATION
+
+xini_context xini_context_init(const char *filename, void *userdata) {
+  return (xini_context){.filename = filename,
+                        .userdata = userdata,
+                        .entry = {.key = NULL, .value = NULL}};
+}
+
+void xini_config_init(xini_config *cfg) {
+#define XINI_ENTRY(sname, type, name, default_value)                           \
+  cfg->sname.name = default_value;
+#define XINI_DYNAMIC_SECTION(sname)
+#define XINI_STATIC_SECTION(sname, entries)                                    \
+  XINI__GET_SECTION_MASK(cfg, sname) = 0;                                      \
+  entries(sname)
+  XINI_SECTIONS
+#undef XINI_ENTRY
+#undef XINI_DYNAMIC_SECTION
+#undef XINI_STATIC_SECTION
+}
+
+static inline void xini__free_str(xini_str *s) { free((void *)*s); }
+static inline void xini__free_int(xini_int *s) { (void)s; }
+static inline void xini__free_dbl(xini_dbl *s) { (void)s; }
+
+#define XINI_ENUM(name, values)                                                \
+  static inline void xini__free_enum_##name(xini_enum_##name *s) { (void)s; }
+XINI_ENUMS
+#undef XINI_ENUM
+
+void xini_config_free(xini_config *cfg) {
+#define XINI_ENUM(name, values) xini_enum_##name : xini__free_enum_##name,
+#define XINI_ENTRY(sname, type, name, default_value)                           \
+  if (XINI__GET_ENTRY_FLAG(sname, name) &                                      \
+      XINI__GET_SECTION_MASK(cfg, sname)) {                                    \
+    _Generic((cfg->sname.name),                                                \
+        XINI_ENUMS xini_str: xini__free_str,                                   \
+        xini_int: xini__free_int,                                              \
+        xini_dbl: xini__free_dbl)(&cfg->sname.name);                           \
+  }
+
+#define XINI_DYNAMIC_SECTION(sname)
+#define XINI_STATIC_SECTION(sname, entries) entries(sname)
+  XINI_SECTIONS
+  *cfg = (xini_config){0};
+#undef XINI_DYNAMIC_SECTION
+#undef XINI_STATIC_SECTION
+#undef XINI_ENTRY
+#undef XINI_ENUM
+}
 
 static inline bool xini__parse_str(xini_str *dest, const char *src) {
   *dest = strdup(src);
@@ -178,7 +265,7 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
     break;
 
 #define XINI_ENUM(name, values) xini_enum_##name : xini__parse_enum_##name,
-#define XINI_ENTRY(sname, type, name)                                          \
+#define XINI_ENTRY(sname, type, name, default_value)                           \
   else if (strcmp(ctx->entry.key, #name) == 0) {                               \
     if (!(_Generic((cfg->sname.name),                                          \
               XINI_ENUMS xini_str: xini__parse_str,                            \
@@ -188,6 +275,7 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
       /* conversion error */                                                   \
       return 0;                                                                \
     }                                                                          \
+    XINI__GET_SECTION_MASK(cfg, sname) |= XINI__GET_ENTRY_FLAG(sname, name);   \
   }
 
 #define XINI_DYNAMIC_SECTION(sname)                                            \
@@ -383,7 +471,7 @@ XINI_ENUMS
 
 void xini_print_config(FILE *file, const xini_config *cfg) {
 #define XINI_ENUM(name, values) xini_enum_##name : xini__print_enum_##name,
-#define XINI_ENTRY(sname, type, name)                                          \
+#define XINI_ENTRY(sname, type, name, default_value)                           \
   (_Generic((cfg->sname.name),                                                 \
        XINI_ENUMS xini_str: xini__print_str,                                   \
        xini_int: xini__print_int,                                              \
