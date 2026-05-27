@@ -450,7 +450,11 @@ static inline void xini__print_dbl(FILE *file, const char *key,
 
 static inline void xini__print_str(FILE *file, const char *key,
                                    xini_str value) {
-  fprintf(file, "%s = \"%s\"\n", key, value);
+
+  if (value)
+    fprintf(file, "%s = \"%s\"\n", key, value);
+  else
+    fprintf(file, "%s = %s\n", key, "NULL");
 }
 
 // generate enum printers
