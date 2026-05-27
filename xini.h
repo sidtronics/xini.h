@@ -329,7 +329,7 @@ static inline xini_parse_status xini__parse_next(FILE *file, xini_entry *pair,
   while (fgets(line, XINI_LINE_BUFFER_SIZE, file)) {
 
     char *start = xini__trim(line);
-    if (*start == '\0' || *start == '#')
+    if (*start == '\0' || *start == '#' || *start == ';')
       continue;
 
     if (*start == '[') {
