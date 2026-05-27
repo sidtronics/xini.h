@@ -99,15 +99,14 @@ typedef struct _xini_context {
   xini_entry entry;
 } xini_context;
 
-static inline xini_context xini_context_init(const char *filename,
-                                             void *userdata) {
-  return (xini_context){.filename = filename,
-                        .userdata = userdata,
-                        .entry = {.key = NULL, .value = NULL}};
-}
+// context
+xini_context xini_context_init(const char *filename, void *userdata);
 
-bool xini_parse_config(xini_context *ctx, xini_config *cfg);
-void xini_print_config(FILE *f, const xini_config *cfg);
+// config
+void xini_config_init(xini_config *cfg);
+void xini_config_free(xini_config *cfg);
+bool xini_config_parse(xini_context *ctx, xini_config *cfg);
+void xini_config_print(FILE *f, const xini_config *cfg);
 
 #define xini_is_section_parsed(cfg, section)                                   \
   (XINI__GET_SECTION_MASK((cfg), section) != 0)
@@ -116,7 +115,7 @@ void xini_print_config(FILE *f, const xini_config *cfg);
   (XINI__GET_SECTION_MASK((cfg), section) &                                    \
    XINI__GET_ENTRY_FLAG(section, entry))
 
-// generate dynamic section handlers
+// dynamic section handlers
 #define XINI_DYNAMIC_SECTION(sname)                                            \
   bool xini_##sname##_entry_handler(xini_context *ctx);
 #define XINI_STATIC_SECTION(sname, entries)
@@ -396,7 +395,7 @@ static inline xini_section xini__parse_section(const char *section) {
   else return XINI__SECTION_UNKNOWN;
 }
 
-bool xini_parse_config(xini_context *ctx, xini_config *cfg) {
+bool xini_config_parse(xini_context *ctx, xini_config *cfg) {
 
   FILE *file = fopen(ctx->filename, "r");
   if (!file) {
@@ -469,7 +468,7 @@ XINI_ENUMS
 #undef XINI_ENUM
 #undef XINI_ENUM_VAL
 
-void xini_print_config(FILE *file, const xini_config *cfg) {
+void xini_config_print(FILE *file, const xini_config *cfg) {
 #define XINI_ENUM(name, values) xini_enum_##name : xini__print_enum_##name,
 #define XINI_ENTRY(sname, type, name, default_value)                           \
   (_Generic((cfg->sname.name),                                                 \
