@@ -38,6 +38,10 @@
 #define XINI_ENUMS
 #endif
 
+typedef int xini_int;
+typedef const char *xini_str;
+typedef double xini_dbl;
+
 // generate enums
 #define XINI_ENUM_VAL(id, string) id,
 #define XINI_ENUM(name, values)                                                \
@@ -46,10 +50,6 @@ XINI_ENUMS
 #undef XINI_ENUM
 #undef XINI_ENUM_VAL
 
-typedef int xini_int;
-typedef const char *xini_str;
-typedef double xini_dbl;
-
 #define XINI_ENTRY(sname, type, name, default_value)                           \
   xini__entry_id_##sname##_##name,
 #define XINI_DYNAMIC_SECTION(sname)
@@ -57,13 +57,14 @@ typedef double xini_dbl;
   typedef enum {                                                               \
     entries(sname) xini__##sname##_entry_count                                 \
   } xini_##sname##_entry_id;                                                   \
-  _Static_assert(                                                              \
-      sizeof(XINI_SECTION_MASK_TYPE) * CHAR_BIT >=                             \
-          xini__##sname##_entry_count,                                         \
-      "[xini.h]: ERROR: XINI_SECTION_MASK_TYPE cannot accommodate current "    \
-      "number of "                                                             \
-      "entries in " #sname "section. Please change XINI_SECTION_MASK_TYPE to " \
-      "a type with larger size.");
+  _Static_assert(sizeof(XINI_SECTION_MASK_TYPE) * CHAR_BIT >=                  \
+                     xini__##sname##_entry_count,                              \
+                 "[xini.h]: ERROR: XINI_SECTION_MASK_TYPE cannot "             \
+                 "accommodate current "                                        \
+                 "number of "                                                  \
+                 "entries in " #sname                                          \
+                 "section. Please change XINI_SECTION_MASK_TYPE to "           \
+                 "a type with larger size.");
 XINI_SECTIONS
 #undef XINI_DYNAMIC_SECTION
 #undef XINI_STATIC_SECTION
