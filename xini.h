@@ -165,8 +165,7 @@ XINI_ENUMS
 void xini_config_free(xini_config *cfg) {
 #define XINI_ENUM(name, values) xini_enum_##name : xini__free_enum_##name,
 #define XINI_ENTRY(sname, type, name, default_value)                           \
-  if (XINI__GET_ENTRY_FLAG(sname, name) &                                      \
-      XINI__GET_SECTION_MASK(cfg, sname)) {                                    \
+  if (xini_is_entry_parsed(cfg, sname, name)) {                                \
     _Generic((cfg->sname.name),                                                \
         XINI_ENUMS xini_str: xini__free_str,                                   \
         xini_int: xini__free_int,                                              \
