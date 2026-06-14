@@ -24,7 +24,7 @@
 #endif
 
 #ifndef XINI_ERROR
-#define XINI_ERROR(...) xini__error(__VA_ARGS__)
+#define XINI_ERROR(ctx, ...) xini__error((ctx), __VA_ARGS__)
 #endif
 
 #ifndef XINI_SECTIONS
@@ -102,6 +102,7 @@ typedef struct _xini_context {
   const char *filename;
   void *userdata;
   xini_entry entry;
+  size_t line;
 } xini_context;
 
 // context
@@ -137,7 +138,8 @@ XINI_SECTIONS
 xini_context xini_context_init(const char *filename, void *userdata) {
   return (xini_context){.filename = filename,
                         .userdata = userdata,
-                        .entry = {.key = NULL, .value = NULL}};
+                        .entry = {.key = NULL, .value = NULL},
+                        .line = 0};
 }
 
 void xini_config_init(xini_config *cfg) {
@@ -182,9 +184,15 @@ void xini_config_free(xini_config *cfg) {
 #undef XINI_ENUM
 }
 
-static inline void xini__error(const char *fmt, ...) {
+static inline void xini__error(const xini_context *ctx, const char *fmt, ...) {
   va_list ap;
-  fputs("[xini.h]: ", stderr);
+  fputs("[xini.h]:", stderr);
+  if (ctx->filename) {
+    fprintf(stderr, " %s:", ctx->filename);
+    if (ctx->line > 0)
+      fprintf(stderr, "%zu:", ctx->line);
+  }
+  fputc(' ', stderr);
   va_start(ap, fmt);
   vfprintf(stderr, fmt, ap);
   va_end(ap);
@@ -285,7 +293,7 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
               xini_int: xini__parse_int,                                       \
               xini_dbl: xini__parse_dbl))(&cfg->sname.name,                    \
                                           ctx->entry.value)) {                 \
-      XINI_ERROR("malformed value for key '%s' in section '%s'",               \
+      XINI_ERROR(ctx, "invalid value for key '%s' in section '%s'",          \
                  ctx->entry.key, #sname);                                      \
       return 0;                                                                \
     }                                                                          \
@@ -295,6 +303,8 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
 #define XINI_DYNAMIC_SECTION(sname)                                            \
   case XINI__SECTION_##sname:                                                  \
     if (!xini_##sname##_entry_handler(ctx)) {                                  \
+      XINI_ERROR(ctx, "dynamic section handler for section '%s' failed",       \
+                 #sname);                                                      \
       return 0;                                                                \
     }                                                                          \
     break;
@@ -304,7 +314,8 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
     if (0) {                                                                   \
     }                                                                          \
     entries(sname) else {                                                      \
-      XINI_ERROR("unknown key '%s' for section '%s'", ctx->entry.key, #sname); \
+      XINI_ERROR(ctx, "unknown key '%s' for section '%s'", ctx->entry.key,     \
+                 #sname);                                                      \
       return 0;                                                                \
     }                                                                          \
     break;
@@ -341,10 +352,14 @@ typedef enum {
   XINI__PARSED_ENTRY,
 } xini_parse_status;
 
-static inline xini_parse_status xini__parse_next(FILE *file, xini_entry *pair,
+static inline xini_parse_status xini__parse_next(FILE *file, xini_context *ctx,
                                                  char *line) {
 
+  xini_entry *pair = &ctx->entry;
+
   while (fgets(line, XINI_LINE_BUFFER_SIZE, file)) {
+
+    ctx->line++;
 
     char *start = xini__trim(line);
     if (*start == '\0' || *start == '#' || *start == ';')
@@ -353,7 +368,7 @@ static inline xini_parse_status xini__parse_next(FILE *file, xini_entry *pair,
     if (*start == '[') {
       char *end = strchr(start + 1, ']');
       if (!end) {
-        XINI_ERROR("expected ']'");
+        XINI_ERROR(ctx, "expected ']'");
         return XINI__PARSED_ERROR;
       }
 
@@ -365,20 +380,20 @@ static inline xini_parse_status xini__parse_next(FILE *file, xini_entry *pair,
 
     char *eq = strchr(start, '=');
     if (!eq) {
-      XINI_ERROR("expected '='");
+      XINI_ERROR(ctx, "expected '='");
       return XINI__PARSED_ERROR;
     }
 
     *eq = 0;
     char *key = xini__trim(start);
     if (!*key) {
-      XINI_ERROR("empty key");
+      XINI_ERROR(ctx, "missing key");
       return XINI__PARSED_ERROR;
     }
 
     char *value = xini__trim(eq + 1);
     if (!*value) {
-      XINI_ERROR("empty value");
+      XINI_ERROR(ctx, "missing value");
       return XINI__PARSED_ERROR;
     }
 
@@ -386,7 +401,7 @@ static inline xini_parse_status xini__parse_next(FILE *file, xini_entry *pair,
       value = value + 1;
       char *end = strchr(value, '"');
       if (!end) {
-        XINI_ERROR("expected '\"'");
+        XINI_ERROR(ctx, "expected '\"'");
         return XINI__PARSED_ERROR;
       }
       *end = 0;
@@ -417,14 +432,14 @@ bool xini_config_parse(xini_context *ctx, xini_config *cfg) {
 
   FILE *file = fopen(ctx->filename, "r");
   if (!file) {
-    XINI_ERROR("error opening file '%s': %s", ctx->filename, strerror(errno));
+    XINI_ERROR(ctx, "error opening file: %s", strerror(errno));
     return false;
   }
 
   xini_parse_status status;
   char line[XINI_LINE_BUFFER_SIZE];
   xini_section section = XINI__SECTION_NONE;
-  while ((status = xini__parse_next(file, &ctx->entry, line))) {
+  while ((status = xini__parse_next(file, ctx, line))) {
 
     // not using switch-case to avoid using yet another goto-label to break
     // out of while loop on EOF
@@ -438,7 +453,7 @@ bool xini_config_parse(xini_context *ctx, xini_config *cfg) {
     if (status == XINI__PARSED_SECTION) {
       section = xini__parse_section(ctx->entry.key);
       if (section == XINI__SECTION_UNKNOWN) {
-        XINI_ERROR("unknown section encountered '%s'", ctx->entry.key);
+        XINI_ERROR(ctx, "unknown section encountered '%s'", ctx->entry.key);
       }
       continue;
     }
@@ -448,7 +463,7 @@ bool xini_config_parse(xini_context *ctx, xini_config *cfg) {
   }
 
   if (section == XINI__SECTION_NONE) {
-    XINI_ERROR("no valid sections found");
+    XINI_ERROR(ctx, "no valid sections found");
     goto bail;
   }
 
