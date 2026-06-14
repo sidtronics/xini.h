@@ -199,8 +199,14 @@ static inline void xini__error(const xini_context *ctx, const char *fmt, ...) {
   fputc('\n', stderr);
 }
 
+static inline char *xini__strdup(const char *s) {
+  size_t n = strlen(s) + 1;
+  char *p = (char *)malloc(n);
+  return (char *)(p ? memcpy(p, s, n) : NULL);
+}
+
 static inline bool xini__parse_str(xini_str *dest, const char *src) {
-  *dest = strdup(src);
+  *dest = xini__strdup(src);
   if (!*dest)
     return false;
   else
@@ -293,7 +299,7 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
               xini_int: xini__parse_int,                                       \
               xini_dbl: xini__parse_dbl))(&cfg->sname.name,                    \
                                           ctx->entry.value)) {                 \
-      XINI_ERROR(ctx, "invalid value for key '%s' in section '%s'",          \
+      XINI_ERROR(ctx, "invalid value for key '%s' in section '%s'",            \
                  ctx->entry.key, #sname);                                      \
       return 0;                                                                \
     }                                                                          \
