@@ -58,6 +58,8 @@
 #define XINI_IMPLEMENTATION
 #include "../xini.h"
 
+// Implement the dynamic section handler. You can fail early by returning false.
+
 bool xini_messages_entry_handler(xini_context *ctx) {
 
   int *count = ctx->userdata;
@@ -77,6 +79,22 @@ int main() {
   xini_config_init(&cfg);
   if (!xini_config_parse(&ctx, &cfg))
     return 1;
+
+  // You can use xini_is_entry_parsed() and xini_is_section_parsed() for
+  // enforcing mandatory entries / sections.
+
+  if (!xini_is_entry_parsed(&cfg, user, first_name) ||
+      !xini_is_entry_parsed(&cfg, user, last_name)) {
+    printf("'first_name' or 'last_name' not found in 'user' section.\n");
+    return 1;
+  }
+
+  if (!xini_is_section_parsed(&cfg, desktop)) {
+    printf("'desktop' section not found in the config.\n");
+    return 1;
+  }
+
+  // Use cfg.<section>.<key> to access parsed values.
 
   printf("\nWelcome %s %s!\n", cfg.user.first_name, cfg.user.last_name);
   printf("Your age is %d.\n", cfg.user.age);
@@ -99,9 +117,14 @@ int main() {
   printf("Total messages read: %d\n", message_counter);
   printf("Saving config to 'backup.ini'\n");
 
+  // Use xini_config_print() to dump the config to a file. Dynamic section is
+  // not included.
+
   FILE *f = fopen("backup.ini", "w");
   xini_config_print(f, &cfg);
   fclose(f);
+
+  // Don't forget to free the xini_config after use.
 
   xini_config_free(&cfg);
   return 0;
