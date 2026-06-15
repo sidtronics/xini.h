@@ -337,7 +337,7 @@ static inline bool xini__parse_dbl(xini_dbl *dest, const char *src) {
 
 // generate enum parsers
 #define XINI_ENUM_VAL(id, string)                                              \
-  else if (strcmp(src, string) == 0) {                                         \
+  else if (strcmp(src, #string) == 0) {                                        \
     *dest = id;                                                                \
   }
 
@@ -591,7 +591,7 @@ static inline void xini__print_str(FILE *file, const char *key,
 }
 
 // generate enum printers
-#define XINI_ENUM_VAL(id, str) str,
+#define XINI_ENUM_VAL(id, str) #str,
 #define XINI_ENUM(name, values)                                                \
   static inline void xini__print_enum_##name(FILE *file, const char *key,      \
                                              xini_enum_##name value) {         \
