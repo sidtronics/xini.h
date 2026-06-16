@@ -1,5 +1,5 @@
 example: example.c ../xini.h
-	cc example.c -o example
+	cc -Wall -Wextra example.c -o example
 
 .PHONY: clean
 clean:

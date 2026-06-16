@@ -45,6 +45,7 @@
   XINI_ENTRY(S, xini_str, first_name, "first")                                 \
   XINI_ENTRY(S, xini_str, last_name, "last")                                   \
   XINI_ENTRY(S, xini_int, age, 0)                                              \
+  XINI_ENTRY(S, xini_bool, show_desktop_info, false)                           \
   XINI_ENTRY(S, xini_enum_day, day_of_birth, DAY_SUNDAY)                       \
   XINI_ENTRY(S, xini_enum_month, month_of_birth, MONTH_JANUARY)
 
@@ -107,12 +108,17 @@ int main() {
   printf("You were born in %s half of the year.\n\n",
          cfg.user.month_of_birth <= MONTH_JUNE ? "first" : "second");
 
-  printf("Your desktop info:\n");
-  printf("Wallpaper path: '%s'\n", cfg.desktop.wallpaper_path);
-  printf("Display resolution: %dx%d\n", cfg.desktop.width, cfg.desktop.height);
-  printf("Window opacity: %.1f\n", cfg.desktop.opacity);
-  printf("Supports floating windows?: %s\n\n",
-         cfg.desktop.window_manager_kind != WM_TILING ? "yes" : "no");
+  // Boolean
+  if (cfg.user.show_desktop_info) {
+
+    printf("Your desktop info:\n");
+    printf("Wallpaper path: '%s'\n", cfg.desktop.wallpaper_path);
+    printf("Display resolution: %dx%d\n", cfg.desktop.width,
+           cfg.desktop.height);
+    printf("Window opacity: %.1f\n", cfg.desktop.opacity);
+    printf("Supports floating windows?: %s\n\n",
+           cfg.desktop.window_manager_kind != WM_TILING ? "yes" : "no");
+  }
 
   printf("Total messages read: %d\n", message_counter);
   printf("Saving config to 'backup.ini'\n");

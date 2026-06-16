@@ -61,6 +61,7 @@
  *  xini_int: Integer
  *  xini_dbl: Float
  *  xini_str: String
+ *  xini_bool: Boolean
  *  xini_enum_<name>: Custom user enum
  *
  * Options:
@@ -133,6 +134,7 @@
 typedef int xini_int;
 typedef const char *xini_str;
 typedef double xini_dbl;
+typedef bool xini_bool;
 
 // generate custom enums
 #define XINI_ENUM_VAL(id, string) id,
@@ -335,6 +337,18 @@ static inline bool xini__parse_dbl(xini_dbl *dest, const char *src) {
   return true;
 }
 
+static inline bool xini__parse_bool(xini_bool *dest, const char *src) {
+
+  if (strcmp(src, "true") == 0)
+    *dest = true;
+  else if (strcmp(src, "false") == 0)
+    *dest = false;
+  else
+    return false;
+
+  return true;
+}
+
 // generate enum parsers
 #define XINI_ENUM_VAL(id, string)                                              \
   else if (strcmp(src, #string) == 0) {                                        \
@@ -387,8 +401,9 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
     if (!(_Generic((cfg->sname.name),                                          \
               XINI_ENUMS xini_str: xini__parse_str,                            \
               xini_int: xini__parse_int,                                       \
-              xini_dbl: xini__parse_dbl))(&cfg->sname.name,                    \
-                                          ctx->entry.value)) {                 \
+              xini_dbl: xini__parse_dbl,                                       \
+              xini_bool: xini__parse_bool))(&cfg->sname.name,                  \
+                                            ctx->entry.value)) {               \
       XINI_ERROR(ctx, "invalid value for key '%s' in section '%s'",            \
                  ctx->entry.key, #sname);                                      \
       return 0;                                                                \
@@ -571,6 +586,15 @@ bail:
   return false;
 }
 
+static inline void xini__print_str(FILE *file, const char *key,
+                                   xini_str value) {
+
+  if (value)
+    fprintf(file, "%s = \"%s\"\n", key, value);
+  else
+    fprintf(file, "%s = %s\n", key, "NULL");
+}
+
 static inline void xini__print_int(FILE *file, const char *key,
                                    xini_int value) {
   fprintf(file, "%s = %d\n", key, value);
@@ -581,13 +605,10 @@ static inline void xini__print_dbl(FILE *file, const char *key,
   fprintf(file, "%s = %.2f\n", key, value);
 }
 
-static inline void xini__print_str(FILE *file, const char *key,
-                                   xini_str value) {
+static inline void xini__print_bool(FILE *file, const char *key,
+                                    xini_bool value) {
 
-  if (value)
-    fprintf(file, "%s = \"%s\"\n", key, value);
-  else
-    fprintf(file, "%s = %s\n", key, "NULL");
+  fprintf(file, "%s = %s\n", key, value ? "true" : "false");
 }
 
 // generate enum printers
@@ -611,7 +632,8 @@ void xini_config_print(FILE *file, const xini_config *cfg) {
   (_Generic((cfg->sname.name),                                                 \
        XINI_ENUMS xini_str: xini__print_str,                                   \
        xini_int: xini__print_int,                                              \
-       xini_dbl: xini__print_dbl))(file, #name, cfg->sname.name);
+       xini_dbl: xini__print_dbl,                                              \
+       xini_bool: xini__print_bool))(file, #name, cfg->sname.name);
 
 #define XINI_DYNAMIC_SECTION(sname)
 #define XINI_STATIC_SECTION(sname, entries)                                    \
@@ -629,6 +651,7 @@ void xini_config_print(FILE *file, const xini_config *cfg) {
 static inline void xini__free_str(xini_str *s) { free((void *)*s); }
 static inline void xini__free_int(xini_int *s) { (void)s; }
 static inline void xini__free_dbl(xini_dbl *s) { (void)s; }
+static inline void xini__free_bool(xini_bool *s) { (void)s; }
 
 #define XINI_ENUM(name, values)                                                \
   static inline void xini__free_enum_##name(xini_enum_##name *s) { (void)s; }
@@ -642,7 +665,8 @@ void xini_config_free(xini_config *cfg) {
     _Generic((cfg->sname.name),                                                \
         XINI_ENUMS xini_str: xini__free_str,                                   \
         xini_int: xini__free_int,                                              \
-        xini_dbl: xini__free_dbl)(&cfg->sname.name);                           \
+        xini_dbl: xini__free_dbl,                                              \
+        xini_bool: xini__free_bool)(&cfg->sname.name);                         \
   }
 
 #define XINI_DYNAMIC_SECTION(sname)
