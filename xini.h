@@ -1,5 +1,5 @@
 /*
- * xini.h - X-macro powered header-only INI parser - v0.1.0
+ * xini.h - X-macro powered header-only INI parser - v0.2.0
  * ========================================================
  *
  * Just define your INI schema using the provided X-macro API. The library
@@ -765,6 +765,9 @@ void xini_config_free(xini_config *cfg) {
 /*  Revision History:
  *
  *   0.1.0 (2026-06-15) initial release
+ *   0.2.0 (2026-06-26) Support Boolean type. (xini_bool)
+ *                      Support user types.
+ *                      Simplified print handler.
  *
  */
 

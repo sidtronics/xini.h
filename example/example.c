@@ -1,3 +1,11 @@
+// example.c
+//
+// Complete example showing how to define a configuration schema, implement
+// custom types and dynamic section handlers, parse and validate a configuration
+// file, access the generated configuration structures, save the configuration,
+// and clean up resources.
+//
+
 // Enumerations
 
 #define XINI_ENUMS                                                             \
