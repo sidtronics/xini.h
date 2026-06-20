@@ -34,8 +34,9 @@
   XINI_ENUM_VAL(WM_DYNAMIC, dynamic)                                           \
   XINI_ENUM_VAL(WM_SCROLLING, scrolling)
 
+// User types
+
 #define XINI_USER_TYPES                                                        \
-  /*asds */                                                                    \
   XINI_USER_TYPE(                                                              \
       struct {                                                                 \
         uint8_t r;                                                             \
@@ -71,7 +72,8 @@
 #define XINI_IMPLEMENTATION
 #include "../xini.h"
 
-// Implement the dynamic section handler. You can fail early by returning false.
+// Implement the dynamic section handler for 'messages' section. You can fail
+// early by returning false.
 
 bool xini_messages_entry_handler(xini_context *ctx) {
 
@@ -82,6 +84,8 @@ bool xini_messages_entry_handler(xini_context *ctx) {
 
   return true;
 }
+
+// Helper for parsing hex string to integer.
 
 static inline bool parse_hex(int *dest, const char *src) {
   char *endptr = NULL;
@@ -100,6 +104,11 @@ static inline bool parse_hex(int *dest, const char *src) {
   return true;
 }
 
+// Implement handlers for xini_user_color
+
+// Parse handler: Takes "#RRGGBB" string as input and parses each color
+// component to correspoding uint8_t (r, g, b).
+
 static inline bool xini_user_parse_color(xini_user_color *dest,
                                          const char *src) {
   int hex;
@@ -116,13 +125,17 @@ static inline bool xini_user_parse_color(xini_user_color *dest,
   return true;
 }
 
-static inline void xini_user_print_color(FILE *file, const char *key,
-                                         xini_user_color value) {
+// Print handler: Print the type back in "#RRGGBB" format .
+
+static inline void xini_user_print_color(FILE *file, xini_user_color value) {
 
   int hex =
       ((uint32_t)value.r << 16) | ((uint32_t)value.g << 8) | (uint32_t)value.b;
-  fprintf(file, "%s = \"#%.6X\"", key, hex);
+  fprintf(file, "\"#%.6X\"", hex);
 }
+
+// Free handler: This type does not own any dynamically allocated resources,
+// so nothing needs to be freed.
 
 static inline void xini_user_free_color(xini_user_color *s) { (void)s; }
 
@@ -171,8 +184,10 @@ int main() {
     printf("Display resolution: %dx%d\n", cfg.desktop.width,
            cfg.desktop.height);
     printf("Window opacity: %.1f\n", cfg.desktop.opacity);
-    printf("Background color: #%.2X%.2X%.2X\n", cfg.desktop.bg_color.r,
-           cfg.desktop.bg_color.g, cfg.desktop.bg_color.b);
+    printf("Background color components:\n");
+    printf("    Red:   %3.d/255\n", cfg.desktop.bg_color.r);
+    printf("    Green: %3.d/255\n", cfg.desktop.bg_color.g);
+    printf("    Blue:  %3.d/255\n", cfg.desktop.bg_color.b);
     printf("Supports floating windows?: %s\n\n",
            cfg.desktop.window_manager_kind != WM_TILING ? "yes" : "no");
   }
@@ -180,8 +195,8 @@ int main() {
   printf("Total messages read: %d\n", message_counter);
   printf("Saving config to 'backup.ini'\n");
 
-  // Use xini_config_print() to dump the config to a file. Dynamic section is
-  // not included.
+  // Use xini_config_print() to dump the config to a file.
+  // Note: Dynamic section is not included.
 
   FILE *f = fopen("backup.ini", "w");
   xini_config_print(f, &cfg);

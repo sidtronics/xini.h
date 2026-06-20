@@ -11,8 +11,10 @@
  * Schema definition:
  * ~~~~~~~~~~~~~~~~~~
  *
+ * Use the following X-macro API to define your schema.
+ *
  * XINI_SECTIONS
- *  Required. List of all sections.
+ *  Required. List of section lines.
  *  Can be either XINI_STATIC_SECTION() or XINI_DYNAMIC_SECTION()
  *
  * XINI_STATIC_SECTION(name, ENTRIES)
@@ -39,21 +41,46 @@
  * Custom enumerations:
  * ~~~~~~~~~~~~~~~~~~~
  *
+ * Define custom enumerations using the following X-macro API. Use them to map
+ * string values in the INI file to enumeration constants.
+ *
  * XINI_ENUMS
- *  Optional. List of XINI_ENUM lines.
+ *  Optional. List of XINI_ENUM() lines.
  *
  * XINI_ENUM(name, VALUES)
- *  Defines the custom enum.
+ *  Defines a custom enumeration.
  *  Parameters:
  *      - name: name of the custom enum. Use xini_enum_<name> as the type
  *              argument in XINI_ENTRY.
- *      - VALUES: list of XINI_ENUM_VAL lines.
+ *      - VALUES: list of XINI_ENUM_VAL() lines.
  *
  * XINI_ENUM_VAL(IDENTIFIER, string)
  *  Defines an enumerator and its corresponding string value used in INI.
  *  Parameters:
  *      - IDENTIFIER: Enumerator constant used in the code.
  *      - string: String used in the INI file and mapped to this enumerator.
+ *
+ * User types:
+ * ~~~~~~~~~~~
+ *
+ * Define custom user types using the following X-macro API.
+ * Use them to extend the library to support your own types.
+ * For each user-defined type, the library generates a set of handlers.
+ * See the API section below for more information about handlers.
+ *
+ * XINI_USER_TYPES
+ *  Optional. List of XINI_USER_TYPE() lines.
+ *
+ * XINI_USER_TYPE(type, name)
+ *  Defines a user type.
+ *  Parameters:
+ *      - type: The underlying C type. This can be a struct, array, or any
+ *              primitive type such as int, char, etc.
+ *              Note: Using primitive type directly might collide with built-in
+ *              types (xini_int, xini_dbl, etc...). In that case wrap the type
+ *              in struct. For eg. struct {int a;}
+ *      - name: The type name. The generated type is typedef'd as
+ *              'xini_user_<name>'.
  *
  * Supported types:
  * ~~~~~~~~~~~~~~~~
@@ -63,6 +90,7 @@
  *  xini_str: String
  *  xini_bool: Boolean
  *  xini_enum_<name>: Custom user enum
+ *  xini_user_<name>: Custom user type
  *
  * Options:
  * ~~~~~~~~
@@ -265,28 +293,27 @@ XINI_SECTIONS
 // Three handlers are generated for each user type.
 //
 // 1) Parse handler
-// You get value string 'src' as input and you need to implement how to
-// parse the value in '*dest'. Return false on invalid format or any failure
-// else return true.
-//
+// Receives the value string 'src' as input and must parse it into '*dest'.
+// Return false if the format is invalid or parsing fails for any reason;
+// otherwise return true.
 // Signature:
 //      bool xini_user_parse_<name>(xini_user_<name> *dest, const char *src);
 //
 // ----
 //
 // 2) Print handler
-// Implement how to print your type. Called internally in
-// xini_config_print(...).
-//
+// Defines how the type is written to a file. Called internally by
+// xini_config_print(...). Implement how 'value' should be printed to 'file'.
+// Do not print any newline characters, as this may break parsing of the
+// generated output.
 // Signature:
-//      void xini_user_print_<name>(FILE *file, const char *key,
-//                                      xini_user_<name> value);
+//      void xini_user_print_<name>(FILE *file, xini_user_<name> value);
+//
 // ----
 //
 // 3) Free handler
-// Useful to free any memory allocated on heap in corresponding parse handler.
-// Called internally in xini_config_free(...).
-//
+// Used to release any heap memory allocated by the corresponding parse
+// handler. Called internally by xini_config_free(...).
 // Signature:
 //      void xini_user_free_<name>(xini_user_<name> *s);
 //
@@ -295,7 +322,7 @@ XINI_SECTIONS
 #define XINI_USER_TYPE(type, name)                                             \
   static inline bool xini_user_parse_##name(xini_user_##name *dest,            \
                                             const char *src);                  \
-  static inline void xini_user_print_##name(FILE *file, const char *key,       \
+  static inline void xini_user_print_##name(FILE *file,                        \
                                             xini_user_##name value);           \
   static inline void xini_user_free_##name(xini_user_##name *s);
 XINI_USER_TYPES
@@ -639,39 +666,34 @@ bail:
   return false;
 }
 
-static inline void xini__print_str(FILE *file, const char *key,
-                                   xini_str value) {
+static inline void xini__print_str(FILE *file, xini_str value) {
 
   if (value)
-    fprintf(file, "%s = \"%s\"\n", key, value);
+    fprintf(file, "\"%s\"", value);
   else
-    fprintf(file, "%s = %s\n", key, "NULL");
+    fprintf(file, "NULL");
 }
 
-static inline void xini__print_int(FILE *file, const char *key,
-                                   xini_int value) {
-  fprintf(file, "%s = %d\n", key, value);
+static inline void xini__print_int(FILE *file, xini_int value) {
+  fprintf(file, "%d", value);
 }
 
-static inline void xini__print_dbl(FILE *file, const char *key,
-                                   xini_dbl value) {
-  fprintf(file, "%s = %.2f\n", key, value);
+static inline void xini__print_dbl(FILE *file, xini_dbl value) {
+  fprintf(file, "%.2f", value);
 }
 
-static inline void xini__print_bool(FILE *file, const char *key,
-                                    xini_bool value) {
-
-  fprintf(file, "%s = %s\n", key, value ? "true" : "false");
+static inline void xini__print_bool(FILE *file, xini_bool value) {
+  fprintf(file, "%s", value ? "true" : "false");
 }
 
 // generate enum printers
 #define XINI_ENUM_VAL(id, str) #str,
 #define XINI_ENUM(name, values)                                                \
-  static inline void xini__print_enum_##name(FILE *file, const char *key,      \
+  static inline void xini__print_enum_##name(FILE *file,                       \
                                              xini_enum_##name value) {         \
                                                                                \
     const char *enum_to_str[] = {values};                                      \
-    fprintf(file, "%s = \"%s\"\n", key, enum_to_str[value]);                   \
+    fprintf(file, "\"%s\"", enum_to_str[value]);                               \
   }
 
 XINI_ENUMS
@@ -683,16 +705,18 @@ void xini_config_print(FILE *file, const xini_config *cfg) {
 #define XINI_ENUM(name, values) xini_enum_##name : xini__print_enum_##name,
 #define XINI_USER_TYPE(type, name) xini_user_##name : xini_user_print_##name,
 #define XINI_ENTRY(sname, type, name, default_value)                           \
+  fprintf(file, "%s = ", #name);                                               \
   (_Generic((cfg->sname.name),                                                 \
        XINI_ENUMS XINI_USER_TYPES xini_str: xini__print_str,                   \
        xini_int: xini__print_int,                                              \
        xini_dbl: xini__print_dbl,                                              \
-       xini_bool: xini__print_bool))(file, #name, cfg->sname.name);
+       xini_bool: xini__print_bool))(file, cfg->sname.name);                   \
+  fputc('\n', file);
 
 #define XINI_DYNAMIC_SECTION(sname)
 #define XINI_STATIC_SECTION(sname, entries)                                    \
   fprintf(file, "[%s]\n", #sname);                                             \
-  entries(sname) fprintf(file, "\n");
+  entries(sname) fputc('\n', file);
 
   XINI_SECTIONS
 
