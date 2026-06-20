@@ -131,6 +131,10 @@
 #define XINI_ENUMS
 #endif
 
+#ifndef XINI_USER_TYPES
+#define XINI_USER_TYPES
+#endif
+
 typedef int xini_int;
 typedef const char *xini_str;
 typedef double xini_dbl;
@@ -143,6 +147,11 @@ typedef bool xini_bool;
 XINI_ENUMS
 #undef XINI_ENUM
 #undef XINI_ENUM_VAL
+
+// generate user types
+#define XINI_USER_TYPE(type, name) typedef type xini_user_##name;
+XINI_USER_TYPES
+#undef XINI_USER_TYPE
 
 #define XINI_ENTRY(sname, type, name, default_value)                           \
   xini__entry_id_##sname##_##name,
@@ -249,6 +258,48 @@ void xini_config_free(xini_config *cfg);
 XINI_SECTIONS
 #undef XINI_DYNAMIC_SECTION
 #undef XINI_STATIC_SECTION
+
+// user type handlers //
+// ================== //
+
+// Three handlers are generated for each user type.
+//
+// 1) Parse handler
+// You get value string 'src' as input and you need to implement how to
+// parse the value in '*dest'. Return false on invalid format or any failure
+// else return true.
+//
+// Signature:
+//      bool xini_user_parse_<name>(xini_user_<name> *dest, const char *src);
+//
+// ----
+//
+// 2) Print handler
+// Implement how to print your type. Called internally in
+// xini_config_print(...).
+//
+// Signature:
+//      void xini_user_print_<name>(FILE *file, const char *key,
+//                                      xini_user_<name> value);
+// ----
+//
+// 3) Free handler
+// Useful to free any memory allocated on heap in corresponding parse handler.
+// Called internally in xini_config_free(...).
+//
+// Signature:
+//      void xini_user_free_<name>(xini_user_<name> *s);
+//
+// Refer example/example.c for demo.
+
+#define XINI_USER_TYPE(type, name)                                             \
+  static inline bool xini_user_parse_##name(xini_user_##name *dest,            \
+                                            const char *src);                  \
+  static inline void xini_user_print_##name(FILE *file, const char *key,       \
+                                            xini_user_##name value);           \
+  static inline void xini_user_free_##name(xini_user_##name *s);
+XINI_USER_TYPES
+#undef XINI_USER_TYPE
 
 #endif // !XINI_H_
 
@@ -396,10 +447,11 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
     break;
 
 #define XINI_ENUM(name, values) xini_enum_##name : xini__parse_enum_##name,
+#define XINI_USER_TYPE(type, name) xini_user_##name : xini_user_parse_##name,
 #define XINI_ENTRY(sname, type, name, default_value)                           \
   else if (strcmp(ctx->entry.key, #name) == 0) {                               \
     if (!(_Generic((cfg->sname.name),                                          \
-              XINI_ENUMS xini_str: xini__parse_str,                            \
+              XINI_ENUMS XINI_USER_TYPES xini_str: xini__parse_str,            \
               xini_int: xini__parse_int,                                       \
               xini_dbl: xini__parse_dbl,                                       \
               xini_bool: xini__parse_bool))(&cfg->sname.name,                  \
@@ -436,6 +488,7 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
 #undef XINI_DYNAMIC_SECTION
 #undef XINI_STATIC_SECTION
 #undef XINI_ENTRY
+#undef XINI_USER_TYPE
 #undef XINI_ENUM
   }
 
@@ -628,9 +681,10 @@ XINI_ENUMS
 
 void xini_config_print(FILE *file, const xini_config *cfg) {
 #define XINI_ENUM(name, values) xini_enum_##name : xini__print_enum_##name,
+#define XINI_USER_TYPE(type, name) xini_user_##name : xini_user_print_##name,
 #define XINI_ENTRY(sname, type, name, default_value)                           \
   (_Generic((cfg->sname.name),                                                 \
-       XINI_ENUMS xini_str: xini__print_str,                                   \
+       XINI_ENUMS XINI_USER_TYPES xini_str: xini__print_str,                   \
        xini_int: xini__print_int,                                              \
        xini_dbl: xini__print_dbl,                                              \
        xini_bool: xini__print_bool))(file, #name, cfg->sname.name);
@@ -645,6 +699,7 @@ void xini_config_print(FILE *file, const xini_config *cfg) {
 #undef XINI_DYNAMIC_SECTION
 #undef XINI_STATIC_SECTION
 #undef XINI_ENTRY
+#undef XINI_USER_TYPE
 #undef XINI_ENUM
 }
 
@@ -660,10 +715,11 @@ XINI_ENUMS
 
 void xini_config_free(xini_config *cfg) {
 #define XINI_ENUM(name, values) xini_enum_##name : xini__free_enum_##name,
+#define XINI_USER_TYPE(type, name) xini_user_##name : xini_user_free_##name,
 #define XINI_ENTRY(sname, type, name, default_value)                           \
   if (xini_is_entry_parsed(cfg, sname, name)) {                                \
     _Generic((cfg->sname.name),                                                \
-        XINI_ENUMS xini_str: xini__free_str,                                   \
+        XINI_ENUMS XINI_USER_TYPES xini_str: xini__free_str,                   \
         xini_int: xini__free_int,                                              \
         xini_dbl: xini__free_dbl,                                              \
         xini_bool: xini__free_bool)(&cfg->sname.name);                         \
@@ -676,6 +732,7 @@ void xini_config_free(xini_config *cfg) {
 #undef XINI_DYNAMIC_SECTION
 #undef XINI_STATIC_SECTION
 #undef XINI_ENTRY
+#undef XINI_USER_TYPE
 #undef XINI_ENUM
 }
 
