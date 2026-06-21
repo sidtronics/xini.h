@@ -117,8 +117,12 @@ static inline bool parse_hex(int *dest, const char *src) {
 // Parse handler: Takes "#RRGGBB" string as input and parses each color
 // component to correspoding uint8_t (r, g, b).
 
-static inline bool xini_user_parse_color(xini_user_color *dest,
-                                         const char *src) {
+static inline bool xini_user_parse_color(xini_user_color *dest, const char *src,
+                                         bool reparse) {
+
+  (void)reparse; // We do not allocate any memory so we can simply ignore this
+                 // flag as we will simply overwrite the variable.
+
   int hex;
 
   if (strlen(src) != 7 || src[0] != '#')

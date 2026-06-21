@@ -14,9 +14,9 @@ through a single `xini_config` structure.
 * Static sections with strict key validation
 * Dynamic sections with user-defined handlers
 * Custom enumeration generation / parsing
+* Mechanism to easily extend this library to support your own types
 * Supports default values for entires
 * Configuration dumping and cleanup helpers
-* Can be easily extended to support other types
 
 ## Getting Started
 

@@ -1,10 +1,10 @@
 /*
- * xini.h - X-macro powered header-only INI parser - v0.2.0
+ * xini.h - X-macro powered header-only INI parser - v0.3.0
  * ========================================================
  *
  * Just define your INI schema using the provided X-macro API. The library
  * specializes itself to that schema. All you need to do is call
- * xini_parse_config(...), which parses the entire configuration into an
+ * xini_config_parse(...), which parses the entire configuration into an
  * xini_config structure. Individual entries can then be accessed through
  * xini_config.<section>.<key>.
  *
@@ -65,8 +65,9 @@
  *
  * Define custom user types using the following X-macro API.
  * Use them to extend the library to support your own types.
- * For each user-defined type, the library generates a set of handlers.
- * See the API section below for more information about handlers.
+ * For each user-defined type, the library generates a set of handlers which are
+ * needed to be implemented by the user. See the API section below for more
+ * information about handlers.
  *
  * XINI_USER_TYPES
  *  Optional. List of XINI_USER_TYPE() lines.
@@ -293,11 +294,15 @@ XINI_SECTIONS
 // Three handlers are generated for each user type.
 //
 // 1) Parse handler
-// Receives the value string 'src' as input and must parse it into '*dest'.
-// Return false if the format is invalid or parsing fails for any reason;
-// otherwise return true.
+// Receives the string value `src` as input and parses it into `*dest`.
+// `reparse` is set when the entry has already been parsed by a previous call
+// to xini_config_parse(...), or when a duplicate entry is encountered. Use it
+// to free any resources allocated for the type. See xini__parse_str(...) for
+// reference. Returns false if the format is invalid or parsing fails for any
+// reason; otherwise, returns true.
 // Signature:
-//      bool xini_user_parse_<name>(xini_user_<name> *dest, const char *src);
+//      bool xini_user_parse_<name>(xini_user_<name> *dest, const char *src,
+//                                  bool reparse);
 //
 // ----
 //
@@ -321,7 +326,7 @@ XINI_SECTIONS
 
 #define XINI_USER_TYPE(type, name)                                             \
   static inline bool xini_user_parse_##name(xini_user_##name *dest,            \
-                                            const char *src);                  \
+                                            const char *src, bool reparse);    \
   static inline void xini_user_print_##name(FILE *file,                        \
                                             xini_user_##name value);           \
   static inline void xini_user_free_##name(xini_user_##name *s);
@@ -375,7 +380,14 @@ void xini_config_init(xini_config *cfg) {
 #undef XINI_STATIC_SECTION
 }
 
-static inline bool xini__parse_str(xini_str *dest, const char *src) {
+static inline void xini__free_str(xini_str *s) { free((void *)*s); }
+
+static inline bool xini__parse_str(xini_str *dest, const char *src,
+                                   bool reparse) {
+
+  if (reparse)
+    xini__free_str(dest);
+
   *dest = xini__strdup(src);
   if (!*dest)
     return false;
@@ -383,7 +395,11 @@ static inline bool xini__parse_str(xini_str *dest, const char *src) {
     return true;
 }
 
-static inline bool xini__parse_int(xini_int *dest, const char *src) {
+static inline void xini__free_int(xini_int *s) { (void)s; }
+
+static inline bool xini__parse_int(xini_int *dest, const char *src,
+                                   bool reparse) {
+  (void)reparse;
   char *endptr = NULL;
   long val;
 
@@ -400,8 +416,11 @@ static inline bool xini__parse_int(xini_int *dest, const char *src) {
   return true;
 }
 
-static inline bool xini__parse_dbl(xini_dbl *dest, const char *src) {
+static inline void xini__free_dbl(xini_dbl *s) { (void)s; }
 
+static inline bool xini__parse_dbl(xini_dbl *dest, const char *src,
+                                   bool reparse) {
+  (void)reparse;
   char *endptr = NULL;
   double val;
 
@@ -415,8 +434,11 @@ static inline bool xini__parse_dbl(xini_dbl *dest, const char *src) {
   return true;
 }
 
-static inline bool xini__parse_bool(xini_bool *dest, const char *src) {
+static inline void xini__free_bool(xini_bool *s) { (void)s; }
 
+static inline bool xini__parse_bool(xini_bool *dest, const char *src,
+                                    bool reparse) {
+  (void)reparse;
   if (strcmp(src, "true") == 0)
     *dest = true;
   else if (strcmp(src, "false") == 0)
@@ -427,7 +449,11 @@ static inline bool xini__parse_bool(xini_bool *dest, const char *src) {
   return true;
 }
 
-// generate enum parsers
+#define XINI_ENUM(name, values)                                                \
+  static inline void xini__free_enum_##name(xini_enum_##name *s) { (void)s; }
+XINI_ENUMS
+#undef XINI_ENUM
+
 #define XINI_ENUM_VAL(id, string)                                              \
   else if (strcmp(src, #string) == 0) {                                        \
     *dest = id;                                                                \
@@ -435,7 +461,8 @@ static inline bool xini__parse_bool(xini_bool *dest, const char *src) {
 
 #define XINI_ENUM(name, values)                                                \
   static inline bool xini__parse_enum_##name(xini_enum_##name *dest,           \
-                                             const char *src) {                \
+                                             const char *src, bool reparse) {  \
+    (void)reparse;                                                             \
     if (0) {                                                                   \
     }                                                                          \
     values else {                                                              \
@@ -481,8 +508,10 @@ static inline bool xini__parse_entry(xini_section section, xini_context *ctx,
               XINI_ENUMS XINI_USER_TYPES xini_str: xini__parse_str,            \
               xini_int: xini__parse_int,                                       \
               xini_dbl: xini__parse_dbl,                                       \
-              xini_bool: xini__parse_bool))(&cfg->sname.name,                  \
-                                            ctx->entry.value)) {               \
+              xini_bool: xini__parse_bool))(                                   \
+            &cfg->sname.name, ctx->entry.value,                                \
+            xini_is_entry_parsed(cfg, sname, name))) {                         \
+                                                                               \
       XINI_ERROR(ctx, "invalid value for key '%s' in section '%s'",            \
                  ctx->entry.key, #sname);                                      \
       return 0;                                                                \
@@ -728,16 +757,6 @@ void xini_config_print(FILE *file, const xini_config *cfg) {
 #undef XINI_ENUM
 }
 
-static inline void xini__free_str(xini_str *s) { free((void *)*s); }
-static inline void xini__free_int(xini_int *s) { (void)s; }
-static inline void xini__free_dbl(xini_dbl *s) { (void)s; }
-static inline void xini__free_bool(xini_bool *s) { (void)s; }
-
-#define XINI_ENUM(name, values)                                                \
-  static inline void xini__free_enum_##name(xini_enum_##name *s) { (void)s; }
-XINI_ENUMS
-#undef XINI_ENUM
-
 void xini_config_free(xini_config *cfg) {
 #define XINI_ENUM(name, values) xini_enum_##name : xini__free_enum_##name,
 #define XINI_USER_TYPE(type, name) xini_user_##name : xini_user_free_##name,
@@ -765,10 +784,12 @@ void xini_config_free(xini_config *cfg) {
 
 /*  Revision History:
  *
- *   0.1.0 (2026-06-15) initial release
- *   0.2.0 (2026-06-26) Support Boolean type. (xini_bool)
- *                      Support user types.
- *                      Simplified print handler.
+ *   0.1.0 (2026-06-15) Initial release
+ *   0.2.0 (2026-06-20) Support Boolean type (xini_bool)
+ *                      Support user types
+ *                      Simplified print handler
+ *   0.3.0 (2026-06-21) Fixed memory leak in xini_config_parse(...)
+ *                      Reworked parse handler to fix memory leaks on reparsing
  *
  */
 
