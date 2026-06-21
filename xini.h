@@ -658,6 +658,7 @@ bool xini_config_parse(xini_context *ctx, xini_config *cfg) {
     goto bail;
   }
 
+  fclose(file);
   return true;
 
 bail:
